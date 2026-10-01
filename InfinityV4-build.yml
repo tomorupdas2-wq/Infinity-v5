@@ -1,0 +1,51 @@
+name: Build Infinity V4
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract project ZIP
+        run: |
+          mkdir -p project
+          unzip -q *.zip -d project
+          echo "Extracted files:"
+          find project -maxdepth 3 -type f | head -100
+
+      - name: Find Gradle project
+        run: |
+          PROJECT_DIR=$(find project -name gradlew -type f -print -quit | xargs -r dirname)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Could not find gradlew inside the ZIP."
+            exit 1
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Make Gradle executable
+        run: chmod +x "$PROJECT_DIR/gradlew"
+
+      - name: Build client
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: ./gradlew build --no-daemon
+
+      - name: Upload built JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: InfinityV4-build
+          path: |
+            ${{ env.PROJECT_DIR }}/build/libs/*.jar
